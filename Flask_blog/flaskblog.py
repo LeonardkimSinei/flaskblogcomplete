@@ -1,0 +1,72 @@
+from flask import Flask,redirect,render_template,url_for,flash
+from datetime import datetime
+from flask_sqlalchemy import SQLAlchemy
+from forms import RegistrationForm, LogInForm 
+
+app=Flask(__name__)
+app.config['SECRET_KEY']='927d3370b05f51bd344c50f24c54758a' # prevent XSS attacks on forms
+app.config['SQLALCHEMY_DATABASE_URI']='sqlite:///site.db'
+db= SQLAlchemy(app)
+
+class User(db.Model):
+    id= db.Column(db.Integer, primary_key=True)
+    username=db.Column(db.String(20),unique=True, nullable=False)
+    email =db.Column(db.String(120),unique=True,nullable=False)
+    image_file=db.Column(db.String(20),nullable=False, default='default.jpeg')
+    password = db.Column(db.String(20),nullable=False)
+    posts = db.relationship('Post', backref='author', lazy=True)
+
+    def __repr__(self):
+        return f'User("{self.username}", "{self.email}","{self.image_file}")'
+
+# Post model
+class Post(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(120), nullable=False)
+    date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    content = db.Column(db.Text, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+
+    def __repr__(self):
+        return f'Post("{self.title}", "{self.date_posted}")'
+
+with app.app_context():
+    #user_2 = User(username='wewe', email='wewe@gm.com', password='password')
+    #db.session.add(user_2)
+    user = User.query.filter_by(username='mimi').first() 
+    post_1 = Post( title='post one',content="some other random content",user_id=user.id)
+    db.session.add(post_1)
+    db.session.commit()
+    posts = Post.query.all()
+    for post in posts:
+        print(f'Post: {post.title}, content: {post.content}')
+
+
+
+@app.route("/")
+@app.route("/home")
+def home():
+    return render_template("home.html",posts=posts)
+
+
+@app.route("/about")
+def about():
+    return render_template("about.html",title='About')
+
+@app.route("/register",methods=['GET','POST'])
+def register():
+    form= RegistrationForm()
+    if form.validate_on_submit():
+        flash(f'Account created for {form.username.data}!','success')
+        return redirect(url_for('home'))
+    return render_template('register.html',form=form)
+
+@app.route("/login")
+def login():
+    form= LogInForm()
+    return render_template('login.html',form=form)
+
+
+if __name__  == '__main__' :
+    app.run(debug=True) 
